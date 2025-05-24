@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Enhanced Tic Tac Toe</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      margin: 0;
+      background: linear-gradient(to bottom right, #2c3e50, #3498db);
+      color: white;
+      padding: 20px;
+    }
+
+    h1 {
+      margin: 20px 0 10px;
+      font-size: 2.5rem;
+      color: #f1c40f;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.6);
+    }
+
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 100px);
+      grid-template-rows: repeat(3, 100px);
+      gap: 8px;
+      margin-top: 20px;
+    }
+
+    .cell {
+      width: 100px;
+      height: 100px;
+      background: rgba(255, 255, 255, 0.9);
+      color: #2c3e50;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      cursor: pointer;
+      border-radius: 12px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+      transition: transform 0.2s, background-color 0.3s;
+    }
+
+    .cell:hover {
+      background-color: #f0f0f0;
+      transform: scale(1.05);
+    }
+
+    .cell.winning {
+      background-color: #2ecc71;
+      color: white;
+    }
+
+    select, button {
+      padding: 10px 15px;
+      font-size: 1rem;
+      margin-top: 10px;
+      border: none;
+      border-radius: 8px;
+      background-color: #ecf0f1;
+      color: #2c3e50;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+
+    select:hover, button:hover {
+      background-color: #bdc3c7;
+    }
+
+    #status {
+      margin-top: 15px;
+      font-size: 1.2rem;
+      font-weight: bold;
+      text-shadow: 1px 1px 3px black;
+    }
+
+    #scoreboard {
+      margin-top: 20px;
+      font-size: 1rem;
+      background: rgba(255,255,255,0.2);
+      padding: 10px 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    }
+
+    #scoreboard div {
+      margin: 5px 0;
+      color: #fefefe;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/32/Tic_tac_toe.svg/240px-Tic_tac_toe.svg.png"
+       alt="Tic Tac Toe" style="width: 100px; margin-top: 10px;" />
+
+  <h1>Tic Tac Toe</h1>
+
+  <div>
+    <label for="mode">Game Mode:</label>
+    <select id="mode">
+      <option value="human">Human vs Human</option>
+      <option value="ai">Human vs AI</option>
+    </select>
+  </div>
+
+  <div id="symbol-settings" class="hidden">
+    <label for="player-symbol">Choose Your Symbol:</label>
+    <select id="player-symbol">
+      <option value="X">X (goes first)</option>
+      <option value="O">O</option>
+    </select>
+  </div>
+
+  <div id="ai-settings" class="hidden">
+    <label for="difficulty">AI Difficulty:</label>
+    <select id="difficulty">
+      <option value="easy">Easy</option>
+      <option value="medium">Medium</option>
+      <option value="hard">Hard</option>
+    </select>
+  </div>
+
+  <div class="board" id="board"></div>
+  <div id="status">Player X's turn</div>
+  <button id="reset">Restart Game</button>
+
+  <div id="scoreboard">
+    <div>Player X: <span id="x-wins">0</span></div>
+    <div>Player O: <span id="o-wins">0</span></div>
+    <div>Draws: <span id="draws">0</span></div>
+  </div>
+
+  <!-- Sounds -->
+  <audio id="click-sound" src="https://www.soundjay.com/button/sounds/button-16.mp3"></audio>
+  <audio id="win-sound" src="https://www.soundjay.com/human/sounds/applause-01.mp3"></audio>
+  <audio id="draw-sound" src="https://www.soundjay.com/button/sounds/button-3.mp3"></audio>
+
+  <script>
+    const board = document.getElementById('board');
+    const status = document.getElementById('status');
+    const resetButton = document.getElementById('reset');
+    const modeSelect = document.getElementById('mode');
+    const aiSettings = document.getElementById('ai-settings');
+    const symbolSettings = document.getElementById('symbol-settings');
+    const difficultySelect = document.getElementById('difficulty');
+    const playerSymbolSelect = document.getElementById('player-symbol');
+    const xWinsDisplay = document.getElementById('x-wins');
+    const oWinsDisplay = document.getElementById('o-wins');
+    const drawsDisplay = document.getElementById('draws');
+    const clickSound = document.getElementById('click-sound');
+    const winSound = document.getElementById('win-sound');
+    const drawSound = document.getElementById('draw-sound');
+
+    let cells = Array(9).fill(null);
+    let currentPlayer = 'X';
+    let isGameOver = false;
+    let xWins = 0, oWins = 0, draws = 0;
+    let gameMode = modeSelect.value;
+    let aiDifficulty = difficultySelect.value;
+    let playerSymbol = playerSymbolSelect.value;
+    let aiSymbol = playerSymbol === 'X' ? 'O' : 'X';
+
+    const winningCombos = [
+      [0,1,2], [3,4,5], [6,7,8],
+      [0,3,6], [1,4,7], [2,5,8],
+      [0,4,8], [2,4,6]
+    ];
+
+    function createBoard() {
+      board.innerHTML = '';
+      cells = Array(9).fill(null);
+      isGameOver = false;
+
+      gameMode = modeSelect.value;
+      aiDifficulty = difficultySelect.value;
+
+      const isAI = gameMode === 'ai';
+      aiSettings.classList.toggle('hidden', !isAI);
+      symbolSettings.classList.toggle('hidden', !isAI);
+
+      playerSymbol = playerSymbolSelect.value;
+      aiSymbol = playerSymbol === 'X' ? 'O' : 'X';
+      currentPlayer = isAI ? playerSymbol : 'X';
+
+      status.textContent = `Player ${currentPlayer}'s turn`;
+
+      for (let i = 0; i < 9; i++) {
+        const cell = document.createElement('div');
+        cell.classList.add('cell');
+        cell.dataset.index = i;
+        cell.addEventListener('click', handleCellClick);
+        board.appendChild(cell);
+      }
+
+      if (isAI && currentPlayer === aiSymbol) {
+        setTimeout(aiMove, 500);
+      }
+    }
+
+    function handleCellClick(e) {
+      const index = e.target.dataset.index;
+      if (cells[index] || isGameOver) return;
+
+      makeMove(index, currentPlayer);
+
+      if (checkWinner()) {
+        handleWin(currentPlayer);
+      } else if (cells.every(cell => cell)) {
+        handleDraw();
+      } else {
+        currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+        status.textContent = `Player ${currentPlayer}'s turn`;
+
+        if (gameMode === 'ai' && currentPlayer === aiSymbol && !isGameOver) {
+          setTimeout(aiMove, 500);
+        }
+      }
+    }
+
+    function makeMove(index, symbol) {
+      cells[index] = symbol;
+      board.children[index].textContent = symbol;
+      clickSound.play();
+    }
+
+    function handleWin(winner) {
+      const combo = checkWinner();
+      combo.forEach(i => board.children[i].classList.add('winning'));
+      isGameOver = true;
+      status.textContent = `Player ${winner} wins!`;
+      if (winner === 'X') {
+        xWins++; xWinsDisplay.textContent = xWins;
+      } else {
+        oWins++; oWinsDisplay.textContent = oWins;
+      }
+      winSound.play();
+    }
+
+    function handleDraw() {
+      isGameOver = true;
+      status.textContent = "It's a draw!";
+      draws++; drawsDisplay.textContent = draws;
+      drawSound.play();
+    }
+
+    function checkWinner() {
+      return winningCombos.find(combo => {
+        const [a, b, c] = combo;
+        return cells[a] && cells[a] === cells[b] && cells[a] === cells[c];
+      });
+    }
+
+    function aiMove() {
+      let index;
+      const available = cells.map((v, i) => v === null ? i : null).filter(v => v !== null);
+
+      if (aiDifficulty === 'easy') {
+        index = available[Math.floor(Math.random() * available.length)];
+      } else if (aiDifficulty === 'medium') {
+        index = findBlockingMove() ?? available[Math.floor(Math.random() * available.length)];
+      } else {
+        index = minimax(cells.slice(), aiSymbol).index;
+      }
+
+      if (index !== undefined && !isGameOver) {
+        makeMove(index, aiSymbol);
+
+        if (checkWinner()) {
+          handleWin(aiSymbol);
+        } else if (cells.every(cell => cell)) {
+          handleDraw();
+        } else {
+          currentPlayer = playerSymbol;
+          status.textContent = `Player ${currentPlayer}'s turn`;
+        }
+      }
+    }
+
+    function findBlockingMove() {
+      for (let combo of winningCombos) {
+        const [a, b, c] = combo;
+        const values = [cells[a], cells[b], cells[c]];
+        if (values.filter(v => v === playerSymbol).length === 2 && values.includes(null)) {
+          return combo[values.indexOf(null)];
+        }
+      }
+      return null;
+    }
+
+    function minimax(newBoard, player) {
+      const availSpots = newBoard.map((v, i) => v === null ? i : null).filter(v => v !== null);
+      const winner = checkWinnerForMinimax(newBoard);
+      if (winner === playerSymbol) return { score: -10 };
+      if (winner === aiSymbol) return { score: 10 };
+      if (availSpots.length === 0) return { score: 0 };
+
+      const moves = [];
+      for (let i of availSpots) {
+        let move = { index: i };
+        newBoard[i] = player;
+        const result = minimax(newBoard, player === aiSymbol ? playerSymbol : aiSymbol);
+        move.score = result.score;
+        newBoard[i] = null;
+        moves.push(move);
+      }
+
+      return player === aiSymbol
+        ? moves.reduce((best, m) => (m.score > best.score ? m : best))
+        : moves.reduce((best, m) => (m.score < best.score ? m : best));
+    }
+
+    function checkWinnerForMinimax(board) {
+      for (let combo of winningCombos) {
+        const [a, b, c] = combo;
+        if (board[a] && board[a] === board[b] && board[a] === board[c]) {
+          return board[a];
+        }
+      }
+      return null;
+    }
+
+    resetButton.addEventListener('click', createBoard);
+    difficultySelect.addEventListener('change', () => aiDifficulty = difficultySelect.value);
+    modeSelect.addEventListener('change', () => createBoard());
+    playerSymbolSelect.addEventListener('change', () => createBoard());
+
+    createBoard();
+  </script>
+</body>
+</html>
